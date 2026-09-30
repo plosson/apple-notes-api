@@ -1,0 +1,44 @@
+{
+  "name": "apple-notes-api",
+  "version": "1.0.0",
+  "description": "REST API for Apple Notes on macOS (for agents / Tailscale)",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "test": "tsx --test src/**/*.test.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "apple-notes",
+    "notes",
+    "macos",
+    "rest-api",
+    "hono"
+  ],
+  "author": "Pierre-Alexandre Losson",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/plosson/apple-notes-api.git"
+  },
+  "bugs": {
+    "url": "https://github.com/plosson/apple-notes-api/issues"
+  },
+  "homepage": "https://github.com/plosson/apple-notes-api#readme",
+  "dependencies": {
+    "@hono/node-server": "^1.14.1",
+    "hono": "^4.7.7",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3"
+  }
+}

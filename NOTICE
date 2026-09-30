@@ -1,0 +1,12 @@
+apple-notes-api
+Copyright (c) 2026 Pierre-Alexandre Losson
+
+This project is inspired by sweetrb/apple-notes-mcp
+(https://github.com/sweetrb/apple-notes-mcp), Copyright (c) Rob Sweet,
+licensed under the MIT License.
+
+apple-notes-mcp demonstrates accessing Apple Notes.app via AppleScript/JXA
+on macOS. This repository reimplements a clean REST HTTP façade with
+original TypeScript code; it does not copy the MCP server layer wholesale.
+
+The MIT License text for this project is in LICENSE.

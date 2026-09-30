@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Example launchd agent for apple-notes-api on a Mac mini.
+
+  1. Copy to ~/Library/LaunchAgents/com.plosson.apple-notes-api.plist
+  2. Edit ProgramArguments paths, WorkingDirectory, and NOTES_API_KEY
+  3. launchctl load ~/Library/LaunchAgents/com.plosson.apple-notes-api.plist
+
+  Keep NOTES_API_HOST at 127.0.0.1 and expose via Tailscale Serve / funnel
+  (or SSH tunnel) yourself — do not bind to 0.0.0.0 without understanding the risk.
+-->
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.plosson.apple-notes-api</string>
+    <key>WorkingDirectory</key>
+    <string>/Users/YOUR_USER/src/apple-notes-api</string>
+    <key>ProgramArguments</key>
+    <array>
+      <string>/usr/local/bin/node</string>
+      <string>/Users/YOUR_USER/src/apple-notes-api/node_modules/tsx/dist/cli.mjs</string>
+      <string>/Users/YOUR_USER/src/apple-notes-api/src/index.ts</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>NOTES_API_KEY</key>
+      <string>REPLACE_WITH_LONG_RANDOM_SECRET</string>
+      <key>NOTES_API_HOST</key>
+      <string>127.0.0.1</string>
+      <key>NOTES_API_PORT</key>
+      <string>8787</string>
+      <key>PATH</key>
+      <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/YOUR_USER/Library/Logs/apple-notes-api.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/YOUR_USER/Library/Logs/apple-notes-api.err.log</string>
+  </dict>
+</plist>
