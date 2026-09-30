@@ -9,7 +9,7 @@
     "dev": "tsx watch src/index.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc",
-    "test": "tsx --test src/**/*.test.ts"
+    "test": "tsx --test $(find src -name '*.test.ts' | sort)"
   },
   "engines": {
     "node": ">=20"

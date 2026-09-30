@@ -24,15 +24,21 @@ export interface RunJxaOptions {
   args?: unknown[];
 }
 
+/** Injectable JXA runner (default: real osascript; tests supply a mock). */
+export type JxaRunner = <T = unknown>(
+  scriptBody: string,
+  options: RunJxaOptions,
+) => Promise<T>;
+
 /**
  * Run a JXA (JavaScript for Automation) script via `osascript -l JavaScript`.
  * Script source is delivered on stdin (avoids shell quoting / argv size issues).
  * Arguments are embedded via JSON.stringify (safe JS literal).
  */
-export async function runJxa<T = unknown>(
+export const runJxa: JxaRunner = async <T = unknown>(
   scriptBody: string,
   options: RunJxaOptions,
-): Promise<T> {
+): Promise<T> => {
   if (process.platform !== "darwin") {
     throw new NotesPlatformError(
       "Apple Notes API requires macOS (darwin). osascript / Notes.app are not available on this platform.",
@@ -79,7 +85,7 @@ ${scriptBody}
       stderr,
     );
   }
-}
+};
 
 function execOsascript(
   script: string,

@@ -1,5 +1,10 @@
 import { htmlToMarkdown, htmlToPlaintext, plaintextToHtml } from "./html.js";
-import { NotesPlatformError, NotesScriptError, runJxa } from "./applescript.js";
+import {
+  NotesPlatformError,
+  NotesScriptError,
+  runJxa,
+  type JxaRunner,
+} from "./applescript.js";
 
 export { NotesPlatformError, NotesScriptError };
 
@@ -41,11 +46,25 @@ export interface UpdateNoteInput {
   folder?: string;
 }
 
-export class NotesService {
-  constructor(private readonly timeoutMs: number) {}
+/** Structural API used by routes (allows fakes in tests). */
+export interface NotesApi {
+  listFolders(): Promise<FolderInfo[]>;
+  listNotes(query?: ListNotesQuery): Promise<NoteMeta[]>;
+  getNote(id: string): Promise<NoteDetail | null>;
+  createNote(input: CreateNoteInput): Promise<NoteDetail>;
+  updateNote(id: string, input: UpdateNoteInput): Promise<NoteDetail | null>;
+  deleteNote(id: string): Promise<{ deleted: boolean; id: string }>;
+}
+
+export class NotesService implements NotesApi {
+  private readonly run: JxaRunner;
+
+  constructor(private readonly timeoutMs: number, run: JxaRunner = runJxa) {
+    this.run = run;
+  }
 
   async listFolders(): Promise<FolderInfo[]> {
-    return runJxa<FolderInfo[]>(
+    return this.run<FolderInfo[]>(
       `
       var Notes = Application("Notes");
       var out = [];
@@ -71,14 +90,14 @@ export class NotesService {
 
   async listNotes(query: ListNotesQuery = {}): Promise<NoteMeta[]> {
     const limit = query.limit ?? 100;
-    return runJxa<NoteMeta[]>(LIST_NOTES_JXA, {
+    return this.run<NoteMeta[]>(LIST_NOTES_JXA, {
       timeoutMs: this.timeoutMs,
       args: [query.folder ?? null, query.q ?? null, limit],
     });
   }
 
   async getNote(id: string): Promise<NoteDetail | null> {
-    const raw = await runJxa<{
+    const raw = await this.run<{
       id: string;
       name: string;
       folder: string | null;
@@ -96,7 +115,7 @@ export class NotesService {
       ? input.body
       : plaintextToHtml(input.body);
 
-    const created = await runJxa<{
+    const created = await this.run<{
       id: string;
       name: string;
       folder: string | null;
@@ -122,7 +141,7 @@ export class NotesService {
           ? input.body
           : plaintextToHtml(input.body);
 
-    const updated = await runJxa<{
+    const updated = await this.run<{
       id: string;
       name: string;
       folder: string | null;
@@ -139,7 +158,7 @@ export class NotesService {
   }
 
   async deleteNote(id: string): Promise<{ deleted: boolean; id: string }> {
-    return runJxa<{ deleted: boolean; id: string }>(DELETE_NOTE_JXA, {
+    return this.run<{ deleted: boolean; id: string }>(DELETE_NOTE_JXA, {
       timeoutMs: this.timeoutMs,
       args: [id],
     });

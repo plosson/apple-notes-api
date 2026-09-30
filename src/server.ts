@@ -3,17 +3,26 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import type { Config } from "./config.js";
 import { createAuthMiddleware } from "./auth.js";
-import { NotesService } from "./notes/service.js";
+import { NotesService, type NotesApi } from "./notes/service.js";
 import { healthRoutes } from "./routes/health.js";
 import { folderRoutes } from "./routes/folders.js";
 import { noteRoutes } from "./routes/notes.js";
 
-export function createApp(config: Config): Hono {
+export interface CreateAppOptions {
+  /** Inject a mock/fake Notes backend for tests. */
+  notes?: NotesApi;
+  /** Disable request logging (useful in tests). */
+  silent?: boolean;
+}
+
+export function createApp(config: Config, options: CreateAppOptions = {}): Hono {
   const app = new Hono();
-  const notes = new NotesService(config.osascriptTimeoutMs);
+  const notes = options.notes ?? new NotesService(config.osascriptTimeoutMs);
   const requireAuth = createAuthMiddleware(config);
 
-  app.use("*", logger());
+  if (!options.silent) {
+    app.use("*", logger());
+  }
   app.use(
     "*",
     cors({

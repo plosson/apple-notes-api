@@ -164,6 +164,16 @@ npm test
 npm run dev
 ```
 
+## Testing
+
+Unit and route tests use Node's built-in test runner (`tsx --test`) and **never** talk to Notes.app:
+
+- `src/notes/html.test.ts` — HTML/plaintext helpers
+- `src/notes/service.test.ts` — `NotesService` with an injectable mocked JXA runner
+- `src/server.test.ts` — auth (401), health (200), and CRUD paths via a fake `NotesApi`
+
+`NotesService` accepts a `JxaRunner` (default: real `osascript` on macOS). CI runs these mocked tests on Ubuntu and macOS (Node 20 + 22). Live Notes.app integration tests can be added later behind an opt-in skip/flag.
+
 ## License
 
 MIT — see [LICENSE](./LICENSE) and [NOTICE](./NOTICE).

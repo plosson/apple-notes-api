@@ -1,8 +1,8 @@
 import { Hono } from "hono";
-import type { NotesService } from "../notes/service.js";
+import type { NotesApi } from "../notes/service.js";
 import { handleNotesError } from "./errors.js";
 
-export function folderRoutes(notes: NotesService): Hono {
+export function folderRoutes(notes: NotesApi): Hono {
   const app = new Hono();
 
   app.get("/v1/folders", async (c) => {

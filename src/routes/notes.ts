@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import type { NotesService } from "../notes/service.js";
+import type { NotesApi } from "../notes/service.js";
 import { handleNotesError } from "./errors.js";
 
 const listQuerySchema = z.object({
@@ -25,7 +25,7 @@ const updateSchema = z
     message: "At least one of name, body, folder is required",
   });
 
-export function noteRoutes(notes: NotesService): Hono {
+export function noteRoutes(notes: NotesApi): Hono {
   const app = new Hono();
 
   app.get("/v1/notes", async (c) => {
