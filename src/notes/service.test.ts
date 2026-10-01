@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 import type { JxaRunner, RunJxaOptions } from "./applescript.js";
 import { NotesPlatformError, NotesScriptError, runJxa } from "./applescript.js";
 import { NotesService } from "./service.js";
+import type { ChecklistItem } from "./checklist.js";
+import type { ChecklistReader } from "./notestore.js";
 
 type Call = { script: string; options: RunJxaOptions };
 
@@ -153,6 +155,76 @@ describe("NotesService (mocked JXA runner)", () => {
       assert.match(err.message, /Folder not found/);
       return true;
     });
+  });
+});
+
+describe("NotesService checklist state", () => {
+  const raw = {
+    id: "x-coredata://U/ICNote/p1",
+    name: "Groceries",
+    folder: "Notes",
+    created: null,
+    modified: null,
+    bodyHtml: "<div>Groceries</div><ul><li>milk</li><li>eggs</li></ul>",
+  };
+  const reader = (items: ChecklistItem[] | null | Error): ChecklistReader & { asked: string[] } => {
+    const asked: string[] = [];
+    return {
+      asked,
+      available: async () => !(items instanceof Error),
+      checklist: async (id) => {
+        asked.push(id);
+        if (items instanceof Error) throw items;
+        return items;
+      },
+    };
+  };
+
+  it("getNote adds the checklist and marks it in the Markdown", async () => {
+    const { run } = mockRunner(() => raw);
+    const checklists = reader([{ text: "milk", done: true }, { text: "eggs", done: false }]);
+    const note = await new NotesService(5000, run, checklists).getNote(raw.id);
+    assert.ok(note);
+    assert.deepEqual(note.checklist, [{ text: "milk", done: true }, { text: "eggs", done: false }]);
+    assert.match(note.bodyMarkdown, /^- \[x\] milk$/m);
+    assert.match(note.bodyMarkdown, /^- \[ \] eggs$/m);
+    assert.deepEqual(checklists.asked, [raw.id]);
+    // The HTML and plain text stay what Notes returned.
+    assert.equal(note.bodyHtml, raw.bodyHtml);
+    assert.doesNotMatch(note.body, /\[x\]/);
+  });
+
+  it("a reader that fails does not fail getNote: the checklist is null", async () => {
+    const { run } = mockRunner(() => raw);
+    const note = await new NotesService(5000, run, reader(new Error("boom"))).getNote(raw.id);
+    assert.ok(note);
+    assert.equal(note.checklist, null);
+    assert.doesNotMatch(note.bodyMarkdown, /\[/);
+  });
+
+  it("unavailable state (null) and no checklists ([]) stay distinct", async () => {
+    const { run } = mockRunner(() => raw);
+    assert.equal((await new NotesService(5000, run, reader(null)).getNote(raw.id))?.checklist, null);
+    assert.deepEqual((await new NotesService(5000, run, reader([])).getNote(raw.id))?.checklist, []);
+  });
+
+  it("without a reader the checklist is null", async () => {
+    const { run } = mockRunner(() => raw);
+    assert.equal((await new NotesService(5000, run).getNote(raw.id))?.checklist, null);
+  });
+
+  it("a missing note is still null, whatever the reader says", async () => {
+    const { run } = mockRunner(() => null);
+    assert.equal(await new NotesService(5000, run, reader([{ text: "x", done: true }])).getNote("gone"), null);
+  });
+
+  it("create and update do not read the database; their checklist is null", async () => {
+    const { run } = mockRunner(() => raw);
+    const checklists = reader([{ text: "milk", done: true }]);
+    const svc = new NotesService(5000, run, checklists);
+    assert.equal((await svc.createNote({ name: "G", body: "x" })).checklist, null);
+    assert.equal((await svc.updateNote(raw.id, { name: "H" }))?.checklist, null);
+    assert.deepEqual(checklists.asked, []);
   });
 });
 

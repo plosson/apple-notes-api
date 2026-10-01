@@ -9,4 +9,7 @@ apple-notes-mcp demonstrates accessing Apple Notes.app via AppleScript/JXA
 on macOS. This repository reimplements a clean REST HTTP façade with
 original TypeScript code; it does not copy the MCP server layer wholesale.
 
+The layout of Notes' checklist data that src/notes/checklist.ts decodes is
+the one apple-notes-mcp documents (src/utils/checklistParser.ts).
+
 The MIT License text for this project is in LICENSE.

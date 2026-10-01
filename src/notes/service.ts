@@ -1,4 +1,6 @@
 import { htmlToMarkdown, htmlToPlaintext, plaintextToHtml } from "./html.js";
+import { annotateMarkdown, type ChecklistItem } from "./checklist.js";
+import type { ChecklistReader } from "./notestore.js";
 import {
   NotesPlatformError,
   NotesScriptError,
@@ -20,6 +22,12 @@ export interface NoteDetail extends NoteMeta {
   body: string;
   bodyHtml: string;
   bodyMarkdown: string;
+  /**
+   * The note's checklist items with their ticked state, read from Notes'
+   * database. [] when it has none; null when the state was not read
+   * (create and update) or cannot be (no Full Disk Access).
+   */
+  checklist: ChecklistItem[] | null;
 }
 
 export interface FolderInfo {
@@ -59,7 +67,11 @@ export interface NotesApi {
 export class NotesService implements NotesApi {
   private readonly run: JxaRunner;
 
-  constructor(private readonly timeoutMs: number, run: JxaRunner = runJxa) {
+  constructor(
+    private readonly timeoutMs: number,
+    run: JxaRunner = runJxa,
+    private readonly checklists?: ChecklistReader,
+  ) {
     this.run = run;
   }
 
@@ -97,17 +109,20 @@ export class NotesService implements NotesApi {
   }
 
   async getNote(id: string): Promise<NoteDetail | null> {
-    const raw = await this.run<{
-      id: string;
-      name: string;
-      folder: string | null;
-      created: string | null;
-      modified: string | null;
-      bodyHtml: string;
-    } | null>(GET_NOTE_JXA, { timeoutMs: this.timeoutMs, args: [id] });
+    const [raw, checklist] = await Promise.all([
+      this.run<{
+        id: string;
+        name: string;
+        folder: string | null;
+        created: string | null;
+        modified: string | null;
+        bodyHtml: string;
+      } | null>(GET_NOTE_JXA, { timeoutMs: this.timeoutMs, args: [id] }),
+      this.checklists ? this.checklists.checklist(id).catch(() => null) : Promise.resolve(null),
+    ]);
 
     if (!raw) return null;
-    return enrich(raw);
+    return enrich(raw, checklist);
   }
 
   async createNote(input: CreateNoteInput): Promise<NoteDetail> {
@@ -172,8 +187,9 @@ function enrich(raw: {
   created: string | null;
   modified: string | null;
   bodyHtml: string;
-}): NoteDetail {
+}, checklist: ChecklistItem[] | null = null): NoteDetail {
   const bodyHtml = raw.bodyHtml ?? "";
+  const markdown = htmlToMarkdown(bodyHtml);
   return {
     id: raw.id,
     name: raw.name,
@@ -182,7 +198,8 @@ function enrich(raw: {
     modified: raw.modified,
     bodyHtml,
     body: htmlToPlaintext(bodyHtml),
-    bodyMarkdown: htmlToMarkdown(bodyHtml),
+    bodyMarkdown: checklist?.length ? annotateMarkdown(markdown, checklist) : markdown,
+    checklist,
   };
 }
 
