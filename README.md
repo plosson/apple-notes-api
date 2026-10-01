@@ -8,6 +8,7 @@ Inspired by the MIT-licensed [sweetrb/apple-notes-mcp](https://github.com/sweetr
 
 - **macOS** with Notes.app and an account signed in (typically iCloud)
 - **Node.js ≥ 20**
+- **Python 3** (ships with macOS)
 - **Automation** permission for the process that runs this server to control **Notes** (System Settings → Privacy & Security → Automation)
 - Optional: **Full Disk Access** is *not* required for the AppleScript/JXA paths used here
 
@@ -18,22 +19,42 @@ Inspired by the MIT-licensed [sweetrb/apple-notes-mcp](https://github.com/sweetr
 ```bash
 git clone https://github.com/plosson/apple-notes-api.git
 cd apple-notes-api
-npm install
-cp .env.example .env
-# edit .env — set NOTES_API_KEY
+./scripts/install.sh
 ```
 
-Generate a key:
+That's it. The script:
+
+1. Generates a random API key and writes `.env`
+2. Creates a Python venv and installs the menu bar app dependency
+3. Installs two launchd agents under `~/Library/LaunchAgents/` — one for the server, one for the menu bar app
+4. Starts both immediately and at every login
+
+Your API key is printed at the end. Copy it to any agent or client that needs to call the API.
+
+## Menu bar app
+
+A small **𝐍 / N** icon appears in your menu bar:
+
+- **𝐍** — server is running
+- **N** — server is stopped
+
+Click it to **Start**, **Stop**, **Copy API Key** to clipboard, or **Quit** the menu bar app (the server keeps running).
+
+## Uninstall
 
 ```bash
-openssl rand -hex 32
+./scripts/uninstall.sh
 ```
+
+Stops both agents, removes the launchd plists, and optionally removes `.env` and the Python venv.
 
 ## Configure
 
+Edit `.env` to change settings, then re-run `./scripts/install.sh` to apply.
+
 | Variable | Default | Meaning |
 |---|---|---|
-| `NOTES_API_KEY` | _(required)_ | Bearer token for `/v1/*` |
+| `NOTES_API_KEY` | _(generated)_ | Bearer token for `/v1/*` |
 | `NOTES_API_HOST` | `127.0.0.1` | Bind address |
 | `NOTES_API_PORT` | `8787` | Port |
 | `NOTES_API_ALLOW_INSECURE` | unset | Set `1` to start **without** a key (local only) |
@@ -41,17 +62,12 @@ openssl rand -hex 32
 
 Without `NOTES_API_KEY`, the process **refuses to start** unless `NOTES_API_ALLOW_INSECURE=1`.
 
-## Run
+## Run without the daemon (development)
 
 ```bash
-export NOTES_API_KEY="$(openssl rand -hex 32)"
-npm start
+npm start   # reads .env automatically
 # → http://127.0.0.1:8787
 ```
-
-Or load from `.env` with your preferred tooling (`direnv`, launchd, etc.).
-
-A launchd example plist is in [`launchd/com.plosson.apple-notes-api.plist.example`](./launchd/com.plosson.apple-notes-api.plist.example).
 
 ## Expose (Tailscale / tunnels) — at your own risk
 
