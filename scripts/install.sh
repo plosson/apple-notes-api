@@ -34,13 +34,18 @@ fi
 PORT="$(grep '^NOTES_API_PORT=' "$ENV_FILE" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')"
 PORT="${PORT:-8787}"
 
-# Install rumps for the current python3
+# Create venv for menubar app and install rumps into it
+VENV_DIR="$REPO_DIR/.venv-menubar"
+if [[ ! -d "$VENV_DIR" ]]; then
+  echo "Creating Python venv for menu bar app..."
+  python3 -m venv "$VENV_DIR"
+fi
 echo "Installing rumps..."
-python3 -m pip install --quiet rumps
+"$VENV_DIR/bin/pip" install --quiet rumps
 
 # Paths
 NODE_BIN="$(which node)"
-PYTHON3_BIN="$(which python3)"
+PYTHON3_BIN="$VENV_DIR/bin/python3"
 
 # Unload existing agents before overwriting plists
 launchctl unload "$AGENTS_DIR/$LABEL.plist" 2>/dev/null || true
