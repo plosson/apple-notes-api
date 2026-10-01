@@ -10,7 +10,7 @@ Inspired by the MIT-licensed [sweetrb/apple-notes-mcp](https://github.com/sweetr
 - **Node.js ≥ 20**
 - **Python 3** (ships with macOS)
 - **Automation** permission for the process that runs this server to control **Notes** (System Settings → Privacy & Security → Automation)
-- Optional: **Full Disk Access** is *not* required for the AppleScript/JXA paths used here
+- Optional: **Full Disk Access** for the `node` binary that runs the server, to return which checklist items are ticked (see [Checklists](#checklists)). Everything else works without it
 
 > On Linux/CI the server can start and serve `/health`, but note routes return `501 PlatformUnsupported` because `osascript` / Notes.app are darwin-only.
 
@@ -59,6 +59,7 @@ Edit `.env` to change settings, then re-run `./scripts/install.sh` to apply.
 | `NOTES_API_PORT` | `8787` | Port |
 | `NOTES_API_ALLOW_INSECURE` | unset | Set `1` to start **without** a key (local only) |
 | `NOTES_API_OSASCRIPT_TIMEOUT_MS` | `30000` | Per-call osascript timeout |
+| `NOTES_API_NOTESTORE_PATH` | `~/Library/Group Containers/group.com.apple.notes/NoteStore.sqlite` | Notes' database, read for checklist state |
 
 Without `NOTES_API_KEY`, the process **refuses to start** unless `NOTES_API_ALLOW_INSECURE=1`.
 
@@ -90,8 +91,10 @@ Authorization: Bearer <NOTES_API_KEY>
 ### `GET /health` (no auth)
 
 ```json
-{ "ok": true, "version": "1.0.0", "platform": "darwin" }
+{ "ok": true, "version": "1.0.0", "platform": "darwin", "checklistState": true }
 ```
+
+`checklistState` says whether notes come with their checklist state, that is, whether the server can read Notes' database (Full Disk Access).
 
 ### `GET /v1/folders`
 
@@ -106,6 +109,14 @@ List / search note **metadata** (`id`, `name`, `folder`, `created`, `modified`).
 ### `GET /v1/notes/:id`
 
 Full note. `body` is plaintext (HTML stripped), `bodyHtml` is the raw Notes HTML, `bodyMarkdown` is a best-effort conversion.
+
+`checklist` lists the note's checklist items with their state, and `bodyMarkdown` marks them as `- [x]` and `- [ ]`:
+
+```json
+{ "checklist": [{ "text": "milk", "done": true }, { "text": "eggs", "done": false }] }
+```
+
+`checklist` is `[]` when the note has no checklist, and `null` when its state cannot be read (no Full Disk Access, or a locked note). Create and update return `null`.
 
 ### `POST /v1/notes`
 
@@ -162,10 +173,25 @@ curl -s -X DELETE -H "Authorization: Bearer $KEY" \
 
 A future **agentio** plugin can treat this service as a remote Notes backend: configure base URL (e.g. Tailscale IP / MagicDNS) + `NOTES_API_KEY`, then map agent tools to these REST endpoints. This repo intentionally stays a plain HTTP API so any agent runtime can call it.
 
+## Checklists
+
+AppleScript returns a checklist as a plain list: which items are ticked is not in it. The server reads that from Notes' own database instead (`NoteStore.sqlite`, read-only, through `/usr/bin/sqlite3`). The format is undocumented; the decoding follows [sweetrb/apple-notes-mcp](https://github.com/sweetrb/apple-notes-mcp).
+
+This needs **Full Disk Access** for the `node` binary that runs the server (`install.sh` prints its path):
+
+1. System Settings → Privacy & Security → Full Disk Access → **+**
+2. Press ⌘⇧G, paste the path, and add it
+3. Restart the server from the menu bar app (Stop, then Start)
+
+`GET /health` then shows `"checklistState": true`.
+
+Ticking items is **not** supported: neither AppleScript nor any safe path can change a checklist item. Replacing a note's body (`PATCH` with `body`) turns its checklists into plain lists and loses their state.
+
 ## Limitations
 
 - **macOS only** for real Notes operations
 - **Locked / password-protected notes** cannot be read or modified via AppleScript
+- **Checklists**: state is read-only and needs Full Disk Access; a new `body` erases checklists
 - **HTML fidelity**: Notes stores rich HTML; plaintext and markdown fields are lossy conversions
 - **Permissions**: first call triggers the Automation prompt; deny → `403 PermissionDenied`
 - **Large libraries / slow Notes.app**: calls can hit the osascript timeout
@@ -187,6 +213,8 @@ Unit and route tests use Node's built-in test runner (`tsx --test`) and **never*
 - `src/notes/html.test.ts` — HTML/plaintext helpers
 - `src/notes/service.test.ts` — `NotesService` with an injectable mocked JXA runner
 - `src/server.test.ts` — auth (401), health (200), and CRUD paths via a fake `NotesApi`
+- `src/notes/checklist.test.ts` — checklist decoding from hand-built protobuf content, and Markdown marking
+- `src/notes/notestore.test.ts` — database reads with a fake runner, and against a temporary SQLite file through `/usr/bin/sqlite3`
 
 `NotesService` accepts a `JxaRunner` (default: real `osascript` on macOS). CI runs these mocked tests on Ubuntu and macOS (Node 20 + 22). Live Notes.app integration tests can be added later behind an opt-in skip/flag.
 

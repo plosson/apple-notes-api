@@ -4,6 +4,7 @@ import { logger } from "hono/logger";
 import type { Config } from "./config.js";
 import { createAuthMiddleware } from "./auth.js";
 import { NotesService, type NotesApi } from "./notes/service.js";
+import { NoteStore, type ChecklistReader } from "./notes/notestore.js";
 import { healthRoutes } from "./routes/health.js";
 import { folderRoutes } from "./routes/folders.js";
 import { noteRoutes } from "./routes/notes.js";
@@ -11,13 +12,16 @@ import { noteRoutes } from "./routes/notes.js";
 export interface CreateAppOptions {
   /** Inject a mock/fake Notes backend for tests. */
   notes?: NotesApi;
+  /** Inject a fake Notes database reader for tests. */
+  checklists?: ChecklistReader;
   /** Disable request logging (useful in tests). */
   silent?: boolean;
 }
 
 export function createApp(config: Config, options: CreateAppOptions = {}): Hono {
   const app = new Hono();
-  const notes = options.notes ?? new NotesService(config.osascriptTimeoutMs);
+  const checklists = options.checklists ?? new NoteStore(config.noteStorePath);
+  const notes = options.notes ?? new NotesService(config.osascriptTimeoutMs, undefined, checklists);
   const requireAuth = createAuthMiddleware(config);
 
   if (!options.silent) {
@@ -33,7 +37,7 @@ export function createApp(config: Config, options: CreateAppOptions = {}): Hono 
   );
 
   // Public health (no auth)
-  app.route("/", healthRoutes(config));
+  app.route("/", healthRoutes(config, checklists));
 
   // Authenticated API
   app.use("/v1/*", requireAuth);

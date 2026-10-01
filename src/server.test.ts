@@ -12,6 +12,7 @@ import type {
   UpdateNoteInput,
 } from "./notes/service.js";
 import { NotesPlatformError, NotesScriptError } from "./notes/service.js";
+import type { ChecklistReader } from "./notes/notestore.js";
 
 async function json<T = Record<string, unknown>>(res: Response): Promise<T> {
   return (await res.json()) as T;
@@ -24,6 +25,7 @@ function testConfig(overrides: Partial<Config> = {}): Config {
     apiKey: "test-secret-key",
     allowInsecure: false,
     osascriptTimeoutMs: 5000,
+    noteStorePath: "/nonexistent/NoteStore.sqlite",
     version: "1.0.0-test",
     platform: "linux",
     isDarwin: false,
@@ -41,6 +43,7 @@ function sampleNote(overrides: Partial<NoteDetail> = {}): NoteDetail {
     body: "Hello",
     bodyHtml: "<div>Hello</div>",
     bodyMarkdown: "Hello",
+    checklist: null,
     ...overrides,
   };
 }
@@ -138,6 +141,43 @@ describe("GET /health", () => {
     assert.equal(body.ok, true);
     assert.equal(body.version, "1.0.0-test");
     assert.equal(body.platform, "linux");
+  });
+});
+
+describe("GET /health checklistState", () => {
+  const reader = (available: boolean): ChecklistReader => ({
+    available: async () => available,
+    checklist: async () => null,
+  });
+
+  it("is true when Notes' database can be read", async () => {
+    const app = createApp(testConfig(), { notes: new FakeNotes(), checklists: reader(true), silent: true });
+    const body = await json<{ checklistState: boolean }>(await app.request("/health"));
+    assert.equal(body.checklistState, true);
+  });
+
+  it("is false without Full Disk Access", async () => {
+    const app = createApp(testConfig(), { notes: new FakeNotes(), checklists: reader(false), silent: true });
+    const body = await json<{ checklistState: boolean }>(await app.request("/health"));
+    assert.equal(body.checklistState, false);
+  });
+
+  it("is false with the default reader on a database that does not exist", async () => {
+    const app = createApp(testConfig(), { notes: new FakeNotes(), silent: true });
+    const body = await json<{ checklistState: boolean }>(await app.request("/health"));
+    assert.equal(body.checklistState, false);
+  });
+});
+
+describe("GET /v1/notes/:id checklist", () => {
+  it("returns the checklist field as the service gives it", async () => {
+    const config = testConfig();
+    const fake = new FakeNotes();
+    fake.notes.set("note-1", sampleNote({ checklist: [{ text: "milk", done: true }] }));
+    const app = createApp(config, { notes: fake, silent: true });
+    const res = await app.request("/v1/notes/note-1", { headers: auth(config) });
+    const body = await json<{ note: NoteDetail }>(res);
+    assert.deepEqual(body.note.checklist, [{ text: "milk", done: true }]);
   });
 });
 

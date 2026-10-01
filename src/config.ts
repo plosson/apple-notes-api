@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { DEFAULT_NOTESTORE_PATH } from "./notes/notestore.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -25,6 +26,8 @@ export interface Config {
   apiKey: string | null;
   allowInsecure: boolean;
   osascriptTimeoutMs: number;
+  /** Notes' database, read for checklist state (needs Full Disk Access). */
+  noteStorePath: string;
   version: string;
   platform: NodeJS.Platform;
   isDarwin: boolean;
@@ -66,6 +69,7 @@ export function loadConfig(): Config {
     apiKey,
     allowInsecure,
     osascriptTimeoutMs,
+    noteStorePath: process.env.NOTES_API_NOTESTORE_PATH?.trim() || DEFAULT_NOTESTORE_PATH,
     version: readPackageVersion(),
     platform: process.platform,
     isDarwin: process.platform === "darwin",
