@@ -48,6 +48,7 @@ class NotesApiApp(rumps.App):
         self._refresh()
 
     def on_toggle(self, _):
+        import time
         action = "unload" if self._running else "load"
         result = subprocess.run(
             ["launchctl", action, PLIST_PATH],
@@ -59,6 +60,9 @@ class NotesApiApp(rumps.App):
                 title=f"Failed to {'stop' if self._running else 'start'}",
                 message=result.stderr or result.stdout or "Unknown error",
             )
+            return
+        if action == "load":
+            time.sleep(0.5)
         self._refresh()
 
     def on_quit(self, _):

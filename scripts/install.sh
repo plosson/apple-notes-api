@@ -40,8 +40,10 @@ if [[ ! -d "$VENV_DIR" ]]; then
   echo "Creating Python venv for menu bar app..."
   python3 -m venv "$VENV_DIR"
 fi
-echo "Installing rumps..."
-"$VENV_DIR/bin/pip" install --quiet rumps
+if ! "$VENV_DIR/bin/pip" show rumps &>/dev/null; then
+  echo "Installing rumps..."
+  "$VENV_DIR/bin/pip" install --quiet rumps
+fi
 
 # Paths
 NODE_BIN="$(which node)"
@@ -53,7 +55,10 @@ launchctl unload "$AGENTS_DIR/$LABEL_MB.plist" 2>/dev/null || true
 
 mkdir -p "$AGENTS_DIR"
 
-# Render server plist
+# Render plists to temp files, then move atomically
+TMP_SERVER="$(mktemp)"
+TMP_MB="$(mktemp)"
+
 sed \
   -e "s|__REPO_DIR__|$REPO_DIR|g" \
   -e "s|__NODE_BIN__|$NODE_BIN|g" \
@@ -61,16 +66,19 @@ sed \
   -e "s|__NOTES_API_PORT__|$PORT|g" \
   -e "s|__USER__|$(whoami)|g" \
   "$REPO_DIR/launchd/$LABEL.plist.example" \
-  > "$AGENTS_DIR/$LABEL.plist"
+  > "$TMP_SERVER"
 
-# Render menubar plist
 sed \
   -e "s|__REPO_DIR__|$REPO_DIR|g" \
   -e "s|__PYTHON3_BIN__|$PYTHON3_BIN|g" \
   -e "s|__NOTES_API_PORT__|$PORT|g" \
   -e "s|__USER__|$(whoami)|g" \
   "$REPO_DIR/launchd/$LABEL_MB.plist.example" \
-  > "$AGENTS_DIR/$LABEL_MB.plist"
+  > "$TMP_MB"
+
+mv "$TMP_SERVER" "$AGENTS_DIR/$LABEL.plist"
+mv "$TMP_MB" "$AGENTS_DIR/$LABEL_MB.plist"
+chmod 600 "$AGENTS_DIR/$LABEL.plist"
 
 # Load both agents
 launchctl load "$AGENTS_DIR/$LABEL.plist"

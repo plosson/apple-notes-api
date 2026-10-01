@@ -24,5 +24,13 @@ else
   echo ".env kept."
 fi
 
+read -r -p "Remove .venv-menubar (Python venv, ~100 MB)? [y/N] " ans
+if [[ "$ans" =~ ^[Yy]$ ]]; then
+  rm -rf "$REPO_DIR/.venv-menubar"
+  echo ".venv-menubar removed."
+else
+  echo ".venv-menubar kept."
+fi
+
 echo ""
 echo "Uninstall complete."
