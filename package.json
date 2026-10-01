@@ -5,8 +5,8 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "start": "tsx src/index.ts",
-    "dev": "tsx watch src/index.ts",
+    "start": "tsx --env-file .env src/index.ts",
+    "dev": "tsx --env-file .env watch src/index.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc",
     "test": "tsx --test $(find src -name '*.test.ts' | sort)"

@@ -1,5 +1,6 @@
 node_modules/
 .venv-menubar/
+__pycache__/
 dist/
 .env
 .env.local
