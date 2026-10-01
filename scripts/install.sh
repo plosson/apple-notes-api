@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+LABEL="com.plosson.apple-notes-api"
+LABEL_MB="com.plosson.apple-notes-api.menubar"
+AGENTS_DIR="$HOME/Library/LaunchAgents"
+ENV_FILE="$REPO_DIR/.env"
+PLACEHOLDER="change-me-to-a-long-random-secret"
+
+die() { echo "Error: $1" >&2; exit 1; }
+
+# Prerequisites
+for cmd in node python3 openssl; do
+  command -v "$cmd" &>/dev/null || die "$cmd not found in PATH"
+done
+
+# npm install if node_modules is missing
+if [[ ! -d "$REPO_DIR/node_modules" ]]; then
+  echo "Running npm install..."
+  (cd "$REPO_DIR" && npm install --silent)
+fi
+
+# API key — generate if missing or still placeholder
+if [[ ! -f "$ENV_FILE" ]] || grep -q "^NOTES_API_KEY=$PLACEHOLDER" "$ENV_FILE"; then
+  API_KEY="$(openssl rand -hex 32)"
+  cp "$REPO_DIR/.env.example" "$ENV_FILE"
+  sed -i '' "s|$PLACEHOLDER|$API_KEY|" "$ENV_FILE"
+  echo "Generated new API key."
+else
+  API_KEY="$(grep '^NOTES_API_KEY=' "$ENV_FILE" | cut -d= -f2 | tr -d '[:space:]')"
+fi
+
+PORT="$(grep '^NOTES_API_PORT=' "$ENV_FILE" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')"
+PORT="${PORT:-8787}"
+
+# Install rumps for the current python3
+echo "Installing rumps..."
+python3 -m pip install --quiet rumps
+
+# Paths
+NODE_BIN="$(which node)"
+PYTHON3_BIN="$(which python3)"
+
+# Unload existing agents before overwriting plists
+launchctl unload "$AGENTS_DIR/$LABEL.plist" 2>/dev/null || true
+launchctl unload "$AGENTS_DIR/$LABEL_MB.plist" 2>/dev/null || true
+
+mkdir -p "$AGENTS_DIR"
+
+# Render server plist
+sed \
+  -e "s|__REPO_DIR__|$REPO_DIR|g" \
+  -e "s|__NODE_BIN__|$NODE_BIN|g" \
+  -e "s|__NOTES_API_KEY__|$API_KEY|g" \
+  -e "s|__NOTES_API_PORT__|$PORT|g" \
+  -e "s|__USER__|$(whoami)|g" \
+  "$REPO_DIR/launchd/$LABEL.plist.example" \
+  > "$AGENTS_DIR/$LABEL.plist"
+
+# Render menubar plist
+sed \
+  -e "s|__REPO_DIR__|$REPO_DIR|g" \
+  -e "s|__PYTHON3_BIN__|$PYTHON3_BIN|g" \
+  -e "s|__NOTES_API_PORT__|$PORT|g" \
+  -e "s|__USER__|$(whoami)|g" \
+  "$REPO_DIR/launchd/$LABEL_MB.plist.example" \
+  > "$AGENTS_DIR/$LABEL_MB.plist"
+
+# Load both agents
+launchctl load "$AGENTS_DIR/$LABEL.plist"
+launchctl load "$AGENTS_DIR/$LABEL_MB.plist"
+
+echo ""
+echo "apple-notes-api installed and running on port $PORT"
+echo ""
+echo "Your API key (copy this to your agents):"
+echo ""
+echo "  $API_KEY"
+echo ""
