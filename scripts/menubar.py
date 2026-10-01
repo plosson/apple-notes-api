@@ -30,7 +30,9 @@ class NotesApiApp(rumps.App):
             self.status_item,
             self.toggle_item,
             None,
-            rumps.MenuItem("Quit menu bar app", callback=self.on_quit),
+            rumps.MenuItem("Copy API Key", callback=self.on_copy_key),
+            None,
+            rumps.MenuItem("Quit", callback=self.on_quit),
         ]
         self._refresh()
 
@@ -64,6 +66,22 @@ class NotesApiApp(rumps.App):
         if action == "load":
             time.sleep(0.5)
         self._refresh()
+
+    def on_copy_key(self, _):
+        key = None
+        try:
+            with open(".env") as f:
+                for line in f:
+                    if line.startswith("NOTES_API_KEY="):
+                        key = line.split("=", 1)[1].strip()
+                        break
+        except OSError:
+            pass
+        if not key:
+            rumps.alert(title="API Key", message="No API key found in .env")
+            return
+        subprocess.run(["pbcopy"], input=key, text=True)
+        rumps.notification(title="apple-notes-api", subtitle="", message="API key copied to clipboard")
 
     def on_quit(self, _):
         rumps.quit_application()
